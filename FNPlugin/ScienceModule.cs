@@ -35,7 +35,7 @@ namespace FNPlugin {
 
         protected float megajoules_supplied = 0;
 
-        protected String[] modes = { "Researching..." ,"Reprocessing...","Producing Antimatter...","Electrolysing...","Centrifuging..."};
+        protected String[] modes = { "Researching" ,"Reprocessing","Producing Antimatter","Electrolysing","Centrifuging"};
         //protected int active_mode = 0;
         protected float science_rate_f;
         protected float reprocessing_rate_f = 0;
@@ -198,7 +198,7 @@ namespace FNPlugin {
 
 
                     float total_electrical_power_provided = (float) (electrical_power_ratio * (GameConstants.baseAMFPowerConsumption + GameConstants.basePowerConsumption) * 1E6);
-					float antimatter_mass = total_electrical_power_provided/AlcubierreDrive.warpspeed/AlcubierreDrive.warpspeed*1E6f/20000.0f;
+                    double antimatter_mass = total_electrical_power_provided / GameConstants.warpspeed / GameConstants.warpspeed * 1E6 / 20000.0;
 					float antimatter_peristence_to_add = (float) -Math.Min (currentAntimatter_missing, antimatter_mass * time_diff);
 					part.RequestResource("Antimatter", antimatter_peristence_to_add);
 				}
@@ -215,7 +215,7 @@ namespace FNPlugin {
 
             if (IsEnabled) {
 				//anim [animName1].normalizedTime = 1f;
-                statusTitle = modes[active_mode];
+                statusTitle = modes[active_mode] + "...";
                 Fields["scienceRate"].guiActive = false;
                 Fields["reprocessingRate"].guiActive = false;
                 Fields["antimatterRate"].guiActive = false;
@@ -332,7 +332,7 @@ namespace FNPlugin {
                         foreach (PartResource partresource in partresources) {
                             depletedfuelsparecapacity += partresource.maxAmount - partresource.amount;
                         }
-                        part.GetConnectedResources(PartResourceLibrary.Instance.GetDefinition("UF6").id, partresources);
+                        part.GetConnectedResources(PartResourceLibrary.Instance.GetDefinition("UF4").id, partresources);
                         foreach (PartResource partresource in partresources) {
                             uf6sparecapacity += partresource.maxAmount - partresource.amount;
                         }
@@ -344,7 +344,7 @@ namespace FNPlugin {
                         double amount_to_reprocess = Math.Min(currentActinides,depletedfuelsparecapacity*5.0);
 						if (currentActinides > 0 && !double.IsNaN(uf6tothf4_ratio) && !double.IsInfinity(uf6tothf4_ratio)) {
                             double actinides_removed = part.RequestResource("Actinides", GameConstants.baseReprocessingRate * TimeWarp.fixedDeltaTime / 86400.0 * global_rate_multipliers);
-							double uf6added = part.RequestResource ("UF6", -actinides_removed*0.8*uf6tothf4_ratio);
+							double uf6added = part.RequestResource ("UF4", -actinides_removed*0.8*uf6tothf4_ratio);
                             double th4added = part.RequestResource("ThF4", -actinides_removed*0.8*(1-uf6tothf4_ratio));
                             double duf6added = part.RequestResource("DepletedFuel", -actinides_removed * 0.2);
                             double actinidesremovedperhour = actinides_removed / TimeWarp.fixedDeltaTime * 3600.0;
@@ -355,14 +355,13 @@ namespace FNPlugin {
 					} else if (active_mode == 2) { //Antimatter
 						//float more_electrical_power_provided = part.RequestResource("Megajoules", (baseAMFPowerConsumption-basePowerConsumption) * TimeWarp.fixedDeltaTime);
                         float more_electrical_power_provided = consumeFNResource((GameConstants.baseAMFPowerConsumption - GameConstants.basePowerConsumption) * TimeWarp.fixedDeltaTime, FNResourceManager.FNRESOURCE_MEGAJOULES);
-						global_rate_multipliers = global_rate_multipliers / electrical_power_ratio;
 						float total_electrical_power_provided = more_electrical_power_provided + electrical_power_provided;
                         electrical_power_ratio = (float) (total_electrical_power_provided / TimeWarp.fixedDeltaTime / GameConstants.baseAMFPowerConsumption);
-						global_rate_multipliers = global_rate_multipliers * electrical_power_ratio;
+						global_rate_multipliers = crew_capacity_ratio * electrical_power_ratio;
 
                         total_electrical_power_provided = (float) (global_rate_multipliers * GameConstants.baseAMFPowerConsumption * 1E6f);
-						float antimatter_mass = total_electrical_power_provided / AlcubierreDrive.warpspeed / AlcubierreDrive.warpspeed * 1E6f / 20000.0f;
-						antimatter_rate_f = -part.RequestResource ("Antimatter", -antimatter_mass * TimeWarp.fixedDeltaTime) / TimeWarp.fixedDeltaTime;
+                        double antimatter_mass = total_electrical_power_provided / GameConstants.warpspeed / GameConstants.warpspeed * 1E6f / 20000.0f;
+						antimatter_rate_f = (float) -part.RequestResource ("Antimatter", -antimatter_mass * TimeWarp.fixedDeltaTime) / TimeWarp.fixedDeltaTime;
 					} else if (active_mode == 3) {
 						IsEnabled = false;
 					} else if (active_mode == 4) { // Centrifuge
@@ -392,6 +391,13 @@ namespace FNPlugin {
 			} else {
 
 			}
+        }
+
+        public override string getResourceManagerDisplayName() {
+            if (IsEnabled) {
+                return "Science Lab (" + modes[active_mode] + ")";
+            }
+            return "Science Lab";
         }
 
 

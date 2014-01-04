@@ -46,9 +46,9 @@ namespace FNPlugin {
 		[KSPField(isPersistant = false, guiActive = true, guiName = "Upgrade")]
 		public string upgradeCostStr;
 
-		public static double stefan_const = 5.6704e-8;
-		public static float rad_const_h = 1000;
-        public static float alpha = 0.00399201596806387225548902195609f;
+		//public static double stefan_const = 5.6704e-8;
+        protected static float rad_const_h = 1000;
+        protected static double alpha = 0.001998001998001998001998001998;
 
 		protected Animation anim;
 		protected float radiatedThermalPower;
@@ -89,10 +89,10 @@ namespace FNPlugin {
 			return has_radiators;
 		}
 
-		public static float getAverageRadiatorTemperatureForVessel(Vessel vess) {
+		public static double getAverageRadiatorTemperatureForVessel(Vessel vess) {
 			list_of_radiators.RemoveAll(item => item == null);
-			float average_temp = 0;
-			float n_radiators = 0;
+			double average_temp = 0;
+			double n_radiators = 0;
 			foreach (FNRadiator radiator in list_of_radiators) {
 				if (radiator.vessel == vess) {
 					average_temp += radiator.getRadiatorTemperature ();
@@ -284,20 +284,19 @@ namespace FNPlugin {
 					explode_counter = 0;
 				}
 
-				double radiator_temperature_temp_val = radiatorTemp;
+                double radiator_temperature_temp_val = radiatorTemp * Math.Pow(getResourceBarRatio(FNResourceManager.FNRESOURCE_WASTEHEAT), 0.25);
 				if (FNReactor.hasActiveReactors (vessel)) {
-					radiator_temperature_temp_val = Math.Min (FNReactor.getTemperatureofColdestReactor (vessel)/1.2, radiator_temperature_temp_val);
+					radiator_temperature_temp_val = Math.Min (FNReactor.getTemperatureofColdestReactor (vessel)/1.01, radiator_temperature_temp_val);
 				}
 
-				float thermal_power_dissip = (float)(stefan_const * radiatorArea * Math.Pow (radiator_temperature_temp_val, 4) / 1e6) * TimeWarp.fixedDeltaTime;
+                double thermal_power_dissip = (GameConstants.stefan_const * radiatorArea * Math.Pow(radiator_temperature_temp_val, 4) / 1e6) * TimeWarp.fixedDeltaTime;
 				radiatedThermalPower = consumeFNResource (thermal_power_dissip, FNResourceManager.FNRESOURCE_WASTEHEAT) / TimeWarp.fixedDeltaTime;
-
-                double instantaneous_rad_temp = (Math.Min(Math.Pow(radiatedThermalPower * 1e6 / (stefan_const * radiatorArea), 0.25), radiatorTemp));
-                instantaneous_rad_temp = Math.Max(current_rad_temp, FlightGlobals.getExternalTemperature((float)vessel.altitude, vessel.mainBody) + 273.16);
+                double instantaneous_rad_temp = (Math.Min(Math.Pow(radiatedThermalPower * 1e6 / (GameConstants.stefan_const * radiatorArea), 0.25), radiatorTemp));
+                instantaneous_rad_temp = Math.Max(instantaneous_rad_temp, Math.Max(FlightGlobals.getExternalTemperature((float)vessel.altitude, vessel.mainBody) + 273.16, 2.7));
                 if (current_rad_temp <= 0) {
                     current_rad_temp = instantaneous_rad_temp;
                 } else {
-                    current_rad_temp = instantaneous_rad_temp * alpha + (1.0f - alpha) * instantaneous_rad_temp;
+                    current_rad_temp = instantaneous_rad_temp * alpha + (1.0 - alpha) * instantaneous_rad_temp;
                 }
 
 				if (isDeployable) {
@@ -327,20 +326,19 @@ namespace FNPlugin {
 					pivot.transform.localEulerAngles = original_eulers;
 				}
 
-				double radiator_temperature_temp_val = radiatorTemp;
+                double radiator_temperature_temp_val = radiatorTemp * Math.Pow(getResourceBarRatio(FNResourceManager.FNRESOURCE_WASTEHEAT), 0.25);
 				if (FNReactor.hasActiveReactors (vessel)) {
-					radiator_temperature_temp_val = Math.Min (FNReactor.getTemperatureofColdestReactor (vessel)/1.2, radiator_temperature_temp_val);
+					radiator_temperature_temp_val = Math.Min (FNReactor.getTemperatureofColdestReactor (vessel)/1.01, radiator_temperature_temp_val);
 				}
 
-				float thermal_power_dissip = (float)(stefan_const * radiatorArea * Math.Pow (radiator_temperature_temp_val, 4) / 1e7) * TimeWarp.fixedDeltaTime;
+                double thermal_power_dissip = (GameConstants.stefan_const * radiatorArea * Math.Pow(radiator_temperature_temp_val, 4) / 1e7) * TimeWarp.fixedDeltaTime;
 				radiatedThermalPower = consumeFNResource (thermal_power_dissip, FNResourceManager.FNRESOURCE_WASTEHEAT) / TimeWarp.fixedDeltaTime;
-
-                double instantaneous_rad_temp = (Math.Min(Math.Pow(radiatedThermalPower * 1e6 / (stefan_const * radiatorArea), 0.25), radiatorTemp));
-                instantaneous_rad_temp = Math.Max(current_rad_temp, FlightGlobals.getExternalTemperature((float)vessel.altitude, vessel.mainBody) + 273.16);
+                double instantaneous_rad_temp = (Math.Min(Math.Pow(radiatedThermalPower * 1e7 / (GameConstants.stefan_const * radiatorArea), 0.25), radiatorTemp));
+                instantaneous_rad_temp = Math.Max(instantaneous_rad_temp, Math.Max(FlightGlobals.getExternalTemperature((float)vessel.altitude, vessel.mainBody) + 273.16, 2.7));
                 if (current_rad_temp <= 0) {
                     current_rad_temp = instantaneous_rad_temp;
                 } else {
-                    current_rad_temp = instantaneous_rad_temp * alpha + (1.0f - alpha) * instantaneous_rad_temp;
+                    current_rad_temp = instantaneous_rad_temp * alpha + (1.0 - alpha) * instantaneous_rad_temp;
                 }
                 
 				part.maximum_drag = 0.2f;
@@ -356,9 +354,14 @@ namespace FNPlugin {
 		}
 
 		public override string GetInfo() {
-			float thermal_power_dissip = (float)(stefan_const * radiatorArea * Math.Pow (radiatorTemp, 4) / 1e6);
-			float thermal_power_dissip2 = (float)(stefan_const * radiatorArea * Math.Pow (upgradedRadiatorTemp, 4) / 1e6);
-			return String.Format("Waste Heat Radiated\n Present: {0} MW\n After Upgrade: {1} MW", thermal_power_dissip,thermal_power_dissip2);
+            float thermal_power_dissip = (float)(GameConstants.stefan_const * radiatorArea * Math.Pow(radiatorTemp, 4) / 1e6);
+            float thermal_power_dissip2 = (float)(GameConstants.stefan_const * radiatorArea * Math.Pow(upgradedRadiatorTemp, 4) / 1e6);
+            float thermal_power_dissip3 = (float)(GameConstants.stefan_const * radiatorArea * Math.Pow(600, 4) / 1e6);
+            float thermal_power_dissip4 = (float)(GameConstants.stefan_const * radiatorArea * Math.Pow(1200, 4) / 1e6);
+            float thermal_power_dissip5 = (float)(GameConstants.stefan_const * radiatorArea * Math.Pow(1800, 4) / 1e6);
+            float thermal_power_dissip6 = (float)(GameConstants.stefan_const * radiatorArea * Math.Pow(2400, 4) / 1e6);
+            float thermal_power_dissip7 = (float)(GameConstants.stefan_const * radiatorArea * Math.Pow(3000, 4) / 1e6);
+            return String.Format("Maximum Waste Heat Radiated\n Base: {0} MW\n Upgraded: {1} MW\n-----\nRadiator Performance at:\n600K: {2} MW\n1200K: {3} MW\n1800K: {4} MW\n2400K: {5} MW\n3000K: {6} MW\n", thermal_power_dissip, thermal_power_dissip2, thermal_power_dissip3, thermal_power_dissip4, thermal_power_dissip5, thermal_power_dissip6, thermal_power_dissip7);
 		}
 
 	}

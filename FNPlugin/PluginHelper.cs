@@ -26,20 +26,23 @@ namespace FNPlugin {
         public const int REF_BODY_POL = 14;
         public const int REF_BODY_DRES = 15;
         public const int REF_BODY_EELOO = 16;
-        public static string[] atomspheric_resources = {"Oxygen", "Hydrogen","Argon","Deuterium"};
-        public static string[] atomspheric_resources_tocollect = { "Oxidizer", "LiquidFuel", "Argon","Deuterium"};
+
         public static string hydrogen_resource_name = "LiquidFuel";
         public static string oxygen_resource_name = "Oxidizer";
         public static string aluminium_resource_name = "Aluminium";
         public static string methane_resource_name = "LqdMethane";
         public static string argon_resource_name = "Argon";
+        public static string water_resource_name = "LqdWater";
+        public static string hydrogen_peroxide_resource_name = "H2Peroxide";
+        public static string ammonia_resource_name = "Ammonia";
         
 		protected static bool plugin_init = false;
 		protected static bool is_thermal_dissip_disabled_init = false;
 		protected static bool is_thermal_dissip_disabled = false;
         protected static GameDatabase gdb;
         protected static bool resources_configured = false;
-        protected static FloatCurve satcurve = new FloatCurve();
+        
+        
         
         public static string getPluginSaveFilePath() {
             return KSPUtil.ApplicationRootPath + "saves/" + HighLogic.SaveFolder + "/WarpPlugin.cfg";
@@ -167,57 +170,6 @@ namespace FNPlugin {
             return true;
         }
 
-        public static FloatCurve getSatFloatCurve() {
-            return satcurve;
-        }
-
-        public static float getAtmosphereResourceContent(int refBody, int resource) {
-            float resourcecontent = 0;
-            if (refBody == REF_BODY_KERBIN) {
-                if (resource == 0) {
-                    resourcecontent = 0.21f;
-                }
-                if (resource == 2) {
-                    resourcecontent = 0.0093f;
-                }
-            }
-
-            if (refBody == REF_BODY_LAYTHE) {
-                if (resource == 0) {
-                    resourcecontent = 0.18f;
-                }
-                if (resource == 2) {
-                    resourcecontent = 0.0105f;
-                }
-            }
-
-            if (refBody == REF_BODY_JOOL) {
-                if (resource == 1) {
-                    resourcecontent = 0.89f;
-                }
-				if (resource == 3) {
-					resourcecontent = 0.00003f;
-				}
-            }
-
-            if (refBody == REF_BODY_DUNA) {
-                if (resource == 0) {
-                    resourcecontent = 0.0013f;
-                }
-                if (resource == 2) {
-                    resourcecontent = 0.0191f;
-                }
-            }
-
-            if (refBody == REF_BODY_EVE) {
-                if (resource == 2) {
-                    resourcecontent = 0.00007f;
-                }
-            }
-
-            return resourcecontent;
-        }
-
 		public static float getMaxAtmosphericAltitude(CelestialBody body) {
 			if (!body.atmosphere) {
 				return 0;
@@ -261,56 +213,59 @@ namespace FNPlugin {
             return multiplier;
         }
 
-        public void loadPluginResourceConfig() {
 
-        }
 
 		public void Update() {
             this.enabled = true;
             AvailablePart intakePart = PartLoader.getPartInfoByName("CircularIntake");
-            if (intakePart.partPrefab.FindModulesImplementing<AtmosphericIntake>().Count <= 0 && PartLoader.Instance.IsReady()) {
-                plugin_init = false;
+            if (intakePart != null) {
+                if (intakePart.partPrefab.FindModulesImplementing<AtmosphericIntake>().Count <= 0 && PartLoader.Instance.IsReady()) {
+                    plugin_init = false;
+                }
             }
 
             if (!resources_configured) {
-                resources_configured = true;
-                ConfigNode plugin_settings = GameDatabase.Instance.GetConfigNode("GameData/WarpPlugin/WarpPluginSettings/WARP_PLUGIN_SETTINGS");
+                ConfigNode plugin_settings = GameDatabase.Instance.GetConfigNode("WarpPlugin/WarpPluginSettings/WarpPluginSettings");
                 if(plugin_settings != null) {
                     if (plugin_settings.HasValue("HydrogenResourceName")) {
                         PluginHelper.hydrogen_resource_name = plugin_settings.GetValue("HydrogenResourceName");
-                        PluginHelper.atomspheric_resources_tocollect[1] = PluginHelper.hydrogen_resource_name;
+                        Debug.Log("[KSP Interstellar] Hydrogen resource name set to " + PluginHelper.hydrogen_resource_name);
                     }
                     if (plugin_settings.HasValue("OxygenResourceName")) {
                         PluginHelper.oxygen_resource_name = plugin_settings.GetValue("OxygenResourceName");
-                        PluginHelper.atomspheric_resources_tocollect[0] = PluginHelper.oxygen_resource_name;
+                        Debug.Log("[KSP Interstellar] Oxygen resource name set to " + PluginHelper.oxygen_resource_name);
                     }
                     if (plugin_settings.HasValue("AluminiumResourceName")) {
                         PluginHelper.aluminium_resource_name = plugin_settings.GetValue("AluminiumResourceName");
+                        Debug.Log("[KSP Interstellar] Aluminium resource name set to " + PluginHelper.aluminium_resource_name);
                     }
                     if (plugin_settings.HasValue("MethaneResourceName")) {
                         PluginHelper.methane_resource_name = plugin_settings.GetValue("MethaneResourceName");
+                        Debug.Log("[KSP Interstellar] Methane resource name set to " + PluginHelper.methane_resource_name);
                     }
                     if (plugin_settings.HasValue("ArgonResourceName")) {
                         PluginHelper.argon_resource_name = plugin_settings.GetValue("ArgonResourceName");
-                        PluginHelper.atomspheric_resources_tocollect[2] = PluginHelper.argon_resource_name;
+                        Debug.Log("[KSP Interstellar] Argon resource name set to " + PluginHelper.argon_resource_name);
+                    }
+                    if (plugin_settings.HasValue("WaterResourceName")) {
+                        PluginHelper.water_resource_name = plugin_settings.GetValue("WaterResourceName");
+                        Debug.Log("[KSP Interstellar] Water resource name set to " + PluginHelper.water_resource_name);
+                    }
+                    if (plugin_settings.HasValue("HydrogenPeroxideResourceName")) {
+                        PluginHelper.hydrogen_peroxide_resource_name = plugin_settings.GetValue("HydrogenPeroxideResourceName");
+                        Debug.Log("[KSP Interstellar] Hydrogen Peroxide resource name set to " + PluginHelper.hydrogen_peroxide_resource_name);
+                    }
+                    if (plugin_settings.HasValue("AmmoniaResourceName")) {
+                        PluginHelper.ammonia_resource_name = plugin_settings.GetValue("AmmoniaResourceName");
+                        Debug.Log("[KSP Interstellar] Ammonia resource name set to " + PluginHelper.ammonia_resource_name);
                     }
                     if (plugin_settings.HasValue("ThermalMechanicsDisabled")) {
                         PluginHelper.is_thermal_dissip_disabled = bool.Parse(plugin_settings.GetValue("ThermalMechanicsDisabled"));
+                        Debug.Log("[KSP Interstellar] ThermalMechanics set to enabled: " + !PluginHelper.is_thermal_dissip_disabled);
                     }
+                    resources_configured = true;
                 }
-                satcurve = new FloatCurve();
-                satcurve.Add((float)(16.0 * Vector3d.Distance(FlightGlobals.Bodies[REF_BODY_KERBIN].transform.position, FlightGlobals.Bodies[REF_BODY_KERBOL].transform.position)), 0.00390625f, 0, 0);
-                satcurve.Add((float)(8.0 * Vector3d.Distance(FlightGlobals.Bodies[REF_BODY_KERBIN].transform.position, FlightGlobals.Bodies[REF_BODY_KERBOL].transform.position)), 0.015625f, 0, 0);
-                satcurve.Add((float)(4.0 * Vector3d.Distance(FlightGlobals.Bodies[REF_BODY_KERBIN].transform.position, FlightGlobals.Bodies[REF_BODY_KERBOL].transform.position)), 0.0625f, 0, 0);
-                satcurve.Add((float)(2.0 * Vector3d.Distance(FlightGlobals.Bodies[REF_BODY_KERBIN].transform.position, FlightGlobals.Bodies[REF_BODY_KERBOL].transform.position)), 0.25f, 0, 0);
-                satcurve.Add((float)(1.5 * Vector3d.Distance(FlightGlobals.Bodies[REF_BODY_KERBIN].transform.position, FlightGlobals.Bodies[REF_BODY_KERBOL].transform.position)), 0.4444444f, 0, 0);
-                satcurve.Add((float)(1.0 * Vector3d.Distance(FlightGlobals.Bodies[REF_BODY_KERBIN].transform.position, FlightGlobals.Bodies[REF_BODY_KERBOL].transform.position)), 1.0f, 0, 0);
-                satcurve.Add((float)(0.75 * Vector3d.Distance(FlightGlobals.Bodies[REF_BODY_KERBIN].transform.position, FlightGlobals.Bodies[REF_BODY_KERBOL].transform.position)), 1.777778f, 0, 0);
-                satcurve.Add((float)(0.5 * Vector3d.Distance(FlightGlobals.Bodies[REF_BODY_KERBIN].transform.position, FlightGlobals.Bodies[REF_BODY_KERBOL].transform.position)), 4, 0, 0);
-                satcurve.Add((float)(0.25 * Vector3d.Distance(FlightGlobals.Bodies[REF_BODY_KERBIN].transform.position, FlightGlobals.Bodies[REF_BODY_KERBOL].transform.position)), 16, 0, 0);
-                satcurve.Add((float)(0.125 * Vector3d.Distance(FlightGlobals.Bodies[REF_BODY_KERBIN].transform.position, FlightGlobals.Bodies[REF_BODY_KERBOL].transform.position)), 64, 0, 0);
-                satcurve.Add((float)(0.0625 * Vector3d.Distance(FlightGlobals.Bodies[REF_BODY_KERBIN].transform.position, FlightGlobals.Bodies[REF_BODY_KERBOL].transform.position)), 256, 0, 0);
-                satcurve.Add((float)(0.03125 * Vector3d.Distance(FlightGlobals.Bodies[REF_BODY_KERBIN].transform.position, FlightGlobals.Bodies[REF_BODY_KERBOL].transform.position)), 1024, 0, 0);
+                
             }
 
 			if (!plugin_init) {
@@ -399,90 +354,8 @@ namespace FNPlugin {
 								}
 							}
 						}
-						//String path11 = KSPUtil.ApplicationRootPath + "GameData/WarpPlugin/Additions/" + available_part.name + ".cfg";
-						//String path21 = KSPUtil.ApplicationRootPath + "GameData/WarpPlugin/Replacements/" + available_part.name + ".cfg";
-						String path1 = "WarpPlugin/Additions/" + available_part.name + "/" + available_part.name;
-						String path2 = "WarpPlugin/Replacements/" + available_part.name + "/" + available_part.name;
-
-						//ConfigNode config_addition = ConfigNode.Load (path1);
-						//ConfigNode config_replacement = ConfigNode.Load(path2);
-						ConfigNode config_addition = null;
-						ConfigNode config_replacement  = null;
-
-						if(GameDatabase.Instance.ExistsConfigNode(path1)) {
-							config_addition = GameDatabase.Instance.GetConfigNode(path1);
-						}
-						if(GameDatabase.Instance.ExistsConfigNode(path2)) {
-							config_replacement = GameDatabase.Instance.GetConfigNode(path2);
-						}
-						List<ConfigNode> config_nodes = new List<ConfigNode>();
-						//ConfigNode.ConfigNodeList config_nodes = new ConfigNode.ConfigNodeList();
-
-						if(config_replacement != null) {
-
-							foreach(ConfigNode conf_node in config_replacement.nodes) {
-								config_nodes.Add(conf_node);
-							}
-
-							foreach(PartModule pm in prefab_available_part.Modules) {
-								prefab_available_part.Modules.Remove(pm);
-							}
-
-							available_part.moduleInfo = "";
-							available_part.resourceInfo = "";
-						}
-
-						if(config_addition != null) {
-							foreach(ConfigNode conf_node in config_addition.nodes) {
-								config_nodes.Add(conf_node);
-							}
-						}
-
-						if(config_nodes.Count > 0) {
-							print ("[WarpPlugin] PartLoader making update to : " + prefab_available_part.name + " part");
-						}
-
-						foreach (ConfigNode config_part_item in config_nodes) {
-							if(config_part_item != null) {
-								if(config_part_item.name == "RESOURCE") {
-									PartResource pr = prefab_available_part.AddResource(config_part_item);
-									if(available_part.resourceInfo != null && pr != null) {	
-										if(available_part.resourceInfo.Length == 0) {
-											available_part.resourceInfo = pr.resourceName + ":" + pr.amount + " / " + pr.maxAmount;
-										}else{
-											available_part.resourceInfo = available_part.resourceInfo + "\n" + pr.resourceName + ":" + pr.amount + " / " + pr.maxAmount;
-										}
-									}
-								}else if(config_part_item.name == "MODULE") {
-									//print ("[WarpPlugin] blah: " + prefab_available_part.name + " " + config_part_item.GetValue("name"));
-
-									Type type = AssemblyLoader.GetClassByName(typeof(PartModule), config_part_item.GetValue("name"));
-
-									PartModule pm = null;
-									if(type != null) {
-										pm = prefab_available_part.gameObject.AddComponent(type) as PartModule;
-										prefab_available_part.Modules.Add(pm);
-									}
-
-									//print ("[WarpPlugin] blahblah: " + prefab_available_part.name);
-									if(available_part.moduleInfo != null && pm != null) {	
-										if(available_part.moduleInfo.Length == 0) {
-											if(pm.GetInfo().Length >0) {
-												available_part.moduleInfo = pm.GetInfo();
-											}
-										}else{
-											if(pm.GetInfo().Length >0) {
-												available_part.moduleInfo = available_part.moduleInfo + "\n" + pm.GetInfo();
-											}
-										}
-									}
-									//print ("[WarpPlugin] blahblahblah: " + prefab_available_part.name);
-								}
-							}
-						}
-
 					}catch(Exception ex) {
-						print ("[WarpPlugin] Exception caught adding to: " + prefab_available_part.name + " part: " + ex.ToString());
+                        print("[KSP Interstellar] Exception caught adding to: " + prefab_available_part.name + " part: " + ex.ToString());
 					}
 
 

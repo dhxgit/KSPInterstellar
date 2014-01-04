@@ -20,32 +20,26 @@ namespace FNPlugin {
 
 			if (state == StartState.Editor) { return; }
 			this.part.force_activate();
-
+            isEnabled = true;
 			solarPanel = (ModuleDeployableSolarPanel)this.part.Modules["ModuleDeployableSolarPanel"];
-			if (solarPanel != null) {
-				solarPanel.powerCurve = PluginHelper.getSatFloatCurve ();
-			}
 		}
 
 		public override void OnUpdate() {
 			heatProductionStr = wasteheat_production_f.ToString ("0.00") + " KW";
-            double inv_square_mult = Math.Pow(Vector3d.Distance(FlightGlobals.Bodies[PluginHelper.REF_BODY_KERBIN].transform.position, FlightGlobals.Bodies[PluginHelper.REF_BODY_KERBOL].transform.position), 2) / Math.Pow(Vector3d.Distance(vessel.transform.position, FlightGlobals.Bodies[PluginHelper.REF_BODY_KERBOL].transform.position), 2);
-            FloatCurve satcurve = new FloatCurve();
-            satcurve.Add(0.0f, (float)inv_square_mult);
-            if (solarPanel != null) {
-                solarPanel.powerCurve = satcurve;
-            }
 		}
 
 		public override void OnFixedUpdate() {
 			base.OnFixedUpdate ();
-
-			ModuleDeployableSolarPanel solarPanel = (ModuleDeployableSolarPanel)this.part.Modules["ModuleDeployableSolarPanel"];
 			if (solarPanel != null) {
 				float solar_rate = solarPanel.flowRate*TimeWarp.fixedDeltaTime;
 				float heat_rate = solar_rate * 0.5f/1000.0f;
 
-				if (getResourceBarRatio (FNResourceManager.FNRESOURCE_WASTEHEAT) >= 0.98 && solarPanel.panelState == ModuleDeployableSolarPanel.panelStates.EXTENDED) {
+                double inv_square_mult = Math.Pow(Vector3d.Distance(FlightGlobals.Bodies[PluginHelper.REF_BODY_KERBIN].transform.position, FlightGlobals.Bodies[PluginHelper.REF_BODY_KERBOL].transform.position), 2) / Math.Pow(Vector3d.Distance(vessel.transform.position, FlightGlobals.Bodies[PluginHelper.REF_BODY_KERBOL].transform.position), 2);
+                FloatCurve satcurve = new FloatCurve();
+                satcurve.Add(0.0f, (float)inv_square_mult);
+                solarPanel.powerCurve = satcurve;
+
+				if (getResourceBarRatio (FNResourceManager.FNRESOURCE_WASTEHEAT) >= 0.98 && solarPanel.panelState == ModuleDeployableSolarPanel.panelStates.EXTENDED && solarPanel.sunTracking) {
 					solarPanel.Retract ();
 					if (FlightGlobals.ActiveVessel == vessel) {
 						ScreenMessages.PostScreenMessage ("Warning Dangerous Overheating Detected: Solar Panel retraction occuring NOW!", 5.0f, ScreenMessageStyle.UPPER_CENTER);

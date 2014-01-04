@@ -82,7 +82,7 @@ namespace FNPlugin {
                 for (int j = 0; j < pml.Count; ++j) {
                     var curSolarPan = pml.GetModule(j) as ModuleDeployableSolarPanel;
                     if (curSolarPan != null) {
-                        curSolarPan.powerCurve = PluginHelper.getSatFloatCurve();
+                        //curSolarPan.powerCurve = PluginHelper.getSatFloatCurve();
                     }
                 }
             }
@@ -115,8 +115,6 @@ namespace FNPlugin {
 						var curMwRec = pml.GetModule (j) as MicrowavePowerReceiver;
 						var curSolarPan = pml.GetModule (j) as ModuleDeployableSolarPanel;
 						if (curFNGen != null) {
-							List<PartResource> partresources = new List<PartResource> ();
-							part.GetConnectedResources (PartResourceLibrary.Instance.GetDefinition ("Megajoules").id, partresources);
 							float consumeMJ = curFNGen.getMaxPowerOutput () * TimeWarp.fixedDeltaTime;
 							float cvalue = consumeFNResource(consumeMJ,FNResourceManager.FNRESOURCE_MEGAJOULES);
 							electrical_current_available = cvalue*1000/TimeWarp.fixedDeltaTime;
@@ -154,7 +152,7 @@ namespace FNPlugin {
 					//print ("warp: relay inputPower " + inputPowerFixedAlt);
 					genType = "relay";
 				} else if (solar == true) {
-					inputPowerFixedAlt = inputPower / PluginHelper.getSatFloatCurve ().Evaluate ((float)FlightGlobals.Bodies [0].GetAltitude (vessel.transform.position));
+					//inputPowerFixedAlt = inputPower / PluginHelper.getSatFloatCurve ().Evaluate ((float)FlightGlobals.Bodies [0].GetAltitude (vessel.transform.position));
 					//print ("warp: solar inputPower " + inputPowerFixedAlt);
 					genType = "solar";
 				}

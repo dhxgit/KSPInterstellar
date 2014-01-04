@@ -51,7 +51,7 @@ namespace FNPlugin {
 
 		protected int shutdown_counter = 0;
 
-		const float thrust_efficiency = 0.72f;
+		protected float thrust_efficiency = 0.72f;
 
         [KSPField(isPersistant = false, guiActive = true, guiName = "Fuel Mode")]
         public string fuelmode;
@@ -81,7 +81,7 @@ namespace FNPlugin {
             isupgraded = true;
             var curEngine = this.part.Modules["ModuleEngines"] as ModuleEngines;
             if (curEngine != null) {
-                ModuleEngines.Propellant prop = new ModuleEngines.Propellant();
+                Propellant prop = new Propellant();
                 //prop.id = PartResourceLibrary.Instance.GetDefinition("VacuumPlasma").id;
                 //ConfigNode prop_node = new ConfigNode();
                 //PartResourceLibrary.Instance.GetDefinition("VacuumPlasma").Save(prop_node);
@@ -294,10 +294,12 @@ namespace FNPlugin {
 			float temp_to_part_set = Mathf.Min(curEngine.currentThrottle * part.maxTemp * 0.8f,1);
 
 			//curEngine.maxThrust = Mathf.Max(thrust_to_use*thrust_ratio,0.00001f);
-            if (!float.IsNaN(thrust_to_use) && !float.IsInfinity(thrust_to_use)) {
-                curEngine.maxThrust = Mathf.Max(thrust_to_use, 0.00001f);
-            } else {
-                curEngine.maxThrust = 0.00001f;
+            if (curEngine.currentThrottle > 0) {
+                if (!float.IsNaN(thrust_to_use) && !float.IsInfinity(thrust_to_use)) {
+                    curEngine.maxThrust = Mathf.Max(thrust_to_use, 0.00001f);
+                } else {
+                    curEngine.maxThrust = 0.00001f;
+                }
             }
 
 			if (thrust_to_use * thrust_ratio <= 0.0001f && curEngine.currentThrottle * thrust_per_engine > 0.0001f  && !curEngine.flameout) {
@@ -340,15 +342,16 @@ namespace FNPlugin {
             var curEngine = this.part.Modules["ModuleEngines"] as ModuleEngines;
             ConfigNode chosenpropellant = propellants[fuel_mode];
             ConfigNode[] assprops = chosenpropellant.GetNodes("PROPELLANT");
-            List<ModuleEngines.Propellant> list_of_propellants = new List<ModuleEngines.Propellant>();
+            List<Propellant> list_of_propellants = new List<Propellant>();
             //bool propellant_is_upgrade = false;
 
             for (int i = 0; i < assprops.Length; ++i) {
                 fuelmode = chosenpropellant.GetValue("guiName");
                 ispMultiplier = float.Parse(chosenpropellant.GetValue("ispMultiplier"));
+                thrust_efficiency = float.Parse(chosenpropellant.GetValue("efficiency"));
                 //propellant_is_upgrade = bool.Parse(chosenpropellant.GetValue("isUpgraded"));
                 
-                ModuleEngines.Propellant curprop = new ModuleEngines.Propellant();
+                Propellant curprop = new Propellant();
                 curprop.Load(assprops[i]);
                 if (curprop.drawStackGauge) {
                     curprop.drawStackGauge = false;
@@ -409,7 +412,7 @@ namespace FNPlugin {
 				upgraded = false;
 			}
 			ConfigNode[] prop_nodes = getPropellants(upgraded);
-			string return_str = "";
+            string return_str = "Max Power Consumption: " + maxPower.ToString("") + " MW\n";
 			float thrust_per_mw = 0.013089f;
 			foreach (ConfigNode propellant_node in prop_nodes) {
 				float ispMultiplier = float.Parse(propellant_node.GetValue("ispMultiplier"));
@@ -434,6 +437,14 @@ namespace FNPlugin {
 			}
 
             return propellantlist;
+        }
+
+        public override string getResourceManagerDisplayName() {
+            if (isupgraded) {
+                return upgradedName + " Plasma Thruster";
+            } else {
+                return originalName + " Thruster";
+            }
         }
     }
 }

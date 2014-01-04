@@ -10,7 +10,11 @@ namespace FNPlugin {
         }
 
         public override string GetInfo() {
-            return String.Format("Core Temperature: {0}K\n Thermal Power: {1}MW\n Antimatter Max Consumption Rate: {2}mg/sec\n -Upgrade Information-\n Upgraded Core Temperature: {3}K\n Upgraded Power: {4}MW\n Upgraded Antimatter Consumption: {5}mg/sec", ReactorTemp, ThermalPower, resourceRate, upgradedReactorTemp, upgradedThermalPower, upgradedResourceRate);
+            if (!hasTechsRequiredToUpgrade()) {
+                return String.Format(originalName + "\nCore Temperature: {0}K\n Thermal Power: {1}MW\n Antimatter Max Consumption Rate: {2}mg/sec\n -Upgrade Information-\n Upgraded Core Temperature: {3}K\n Upgraded Power: {4}MW\n Upgraded Antimatter Consumption: {5}mg/sec", ReactorTemp, ThermalPower, resourceRate, upgradedReactorTemp, upgradedThermalPower, upgradedResourceRate);
+            } else {
+                return String.Format(upgradedName + "\nThis part is available automatically upgraded\nCore Temperature: {0}K\n Thermal Power: {1}MW\n Antimatter Max Consumption Rate: {2}mg/sec\n", upgradedReactorTemp, upgradedThermalPower, upgradedResourceRate);
+            }
         }
 
         protected override double consumeReactorResource(double resource) {
@@ -21,6 +25,7 @@ namespace FNPlugin {
                 double antimatter_consumed_here = Math.Min(antimatter_resource.amount, resource);
                 antimatter_provided += antimatter_consumed_here;
                 antimatter_resource.amount -= antimatter_consumed_here;
+                resource -= antimatter_consumed_here;
             }
             return antimatter_provided;
         }
@@ -33,6 +38,7 @@ namespace FNPlugin {
                 double antimatter_returned_here = Math.Min(antimatter_resource.maxAmount - antimatter_resource.amount, resource);
                 antimatter_returned += antimatter_returned_here;
                 antimatter_resource.amount += antimatter_returned_here;
+                resource -= antimatter_returned_here;
             }
             return antimatter_returned;
         }

@@ -10,13 +10,7 @@ namespace FNPlugin {
         public bool upgradedToV08 = false;
         [KSPField(isPersistant = true)]
         public bool uranium_fuel = true;
-
-        //const
-        protected const double thorium_power_output_ratio = 1.38;
-        protected const double thorium_resource_burnrate_ratio = 0.45;
-        protected const double thorium_actinides_ratio_factor = 1;
-        protected const double thorium_temperature_ratio_factor = 1.17857;
-
+        
         //Internal
         protected PartResource thf4;
         protected PartResource uf4;
@@ -69,7 +63,7 @@ namespace FNPlugin {
             }
         }
 
-        [KSPEvent(guiName = "Swap Fuel", externalToEVAOnly = true, guiActiveUnfocused = true, unfocusedRange = 2.5f)]
+        [KSPEvent(guiName = "Swap Fuel", externalToEVAOnly = true, guiActiveUnfocused = true, guiActive = false, unfocusedRange = 3.0f)]
         public void SwapFuel() {
             if (actinides.amount <= 0.0001) {
                 if (uranium_fuel) {
@@ -83,6 +77,21 @@ namespace FNPlugin {
                     setUraniumFuel();
                     RefuelUranium();
                 }
+            }
+        }
+
+        [KSPEvent(guiName = "Swap Fuel", guiActiveEditor = true, guiActiveUnfocused = false, guiActive = false)]
+        public void EditorSwapFuel() {
+            if (uranium_fuel) {
+                uranium_fuel = !uranium_fuel;
+                uf4.amount = 0;
+                thf4.amount = thf4.maxAmount;
+                fuelmodeStr = "Thorium";
+            } else {
+                uranium_fuel = !uranium_fuel;
+                thf4.amount = 0;
+                uf4.amount = uf4.maxAmount;
+                fuelmodeStr = "Uranium";
             }
         }
 
@@ -102,20 +111,25 @@ namespace FNPlugin {
             if (uranium_fuel) {
                 return ReactorTemp;
             } else {
-                return (float) (ReactorTemp * thorium_temperature_ratio_factor);
+                return (float) (ReactorTemp * GameConstants.thorium_temperature_ratio_factor);
             }
         }
 
         public override string GetInfo() {
             float uf6_rate_per_day = resourceRate * 86400;
             float up_uf6_rate_per_day = upgradedResourceRate * 86400;
-            return String.Format("Core Temperature: {0}K\n Thermal Power: {1}MW\n UF4 Max Consumption Rate: {2}m³/day\n -Upgrade Information-\n Upgraded Core Temperate: {3}K\n Upgraded Power: {4}MW\n Upgraded UF4 Consumption: {5}m³/day", ReactorTemp, ThermalPower, uf6_rate_per_day, upgradedReactorTemp, upgradedThermalPower, up_uf6_rate_per_day);
+            if (!hasTechsRequiredToUpgrade()) {
+                return String.Format(originalName + "\nCore Temperature: {0}K\n Total Power: {1}MW\n UF4 Max Consumption Rate: {2}m³/day\n -Upgrade Information-\n Upgraded Core Temperate: {3}K\n Upgraded Power: {4}MW\n Upgraded UF4 Consumption: {5}m³/day", ReactorTemp, ThermalPower, uf6_rate_per_day, upgradedReactorTemp, upgradedThermalPower, up_uf6_rate_per_day);
+            } else {
+                return String.Format(upgradedName + "\nThis part is available automatically upgraded\nCore Temperature: {0}K\n Total Power: {1}MW\n UF4 Max Consumption Rate: {2}m³/day\n", ReactorTemp, ThermalPower, uf6_rate_per_day);
+            }
         }
 
         public override void OnStart(PartModule.StartState state) {
             uf4 = part.Resources["UF4"];
             thf4 = part.Resources["ThF4"];
             actinides = part.Resources["Actinides"];
+            Fields["fuelmodeStr"].guiActiveEditor = true;
             if (double.IsNaN(uf4.amount)) {
                 uf4.amount = 0;
             }
@@ -161,7 +175,7 @@ namespace FNPlugin {
             double fuel_to_actinides_ratio = fuel_resource.amount / (actinides.amount + fuel_resource.amount) * fuel_resource.amount / (actinides.amount + fuel_resource.amount);
             if (!uranium_fuel) {
                 if (!double.IsInfinity(fuel_to_actinides_ratio) && !double.IsNaN(fuel_to_actinides_ratio)) {
-                    resource = resource * Math.Min(Math.Exp(-thorium_actinides_ratio_factor/fuel_to_actinides_ratio+1), 1);
+                    resource = resource * Math.Min(Math.Exp(-GameConstants.thorium_actinides_ratio_factor / fuel_to_actinides_ratio + 1), 1);
                 }
             }
             double actinides_max_amount = actinides.maxAmount;
@@ -194,13 +208,15 @@ namespace FNPlugin {
 
         protected void setThoriumFuel() {
             fuel_resource = thf4;
-            ThermalPower = (float)(initial_thermal_power * thorium_power_output_ratio);
-            resourceRate = (float)(initial_resource_rate * thorium_resource_burnrate_ratio);
+            fuelmodeStr = "Thorium";
+            ThermalPower = (float)(initial_thermal_power * GameConstants.thorium_power_output_ratio);
+            resourceRate = (float)(initial_resource_rate * GameConstants.thorium_resource_burnrate_ratio);
             uranium_fuel = false;
         }
 
         protected void setUraniumFuel() {
             fuel_resource = uf4;
+            fuelmodeStr = "Uranium";
             ThermalPower = (float)(initial_thermal_power);
             resourceRate = (float)(initial_resource_rate);
             uranium_fuel = true;
