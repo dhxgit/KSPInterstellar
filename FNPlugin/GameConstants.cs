@@ -5,7 +5,7 @@ using System.Text;
 
 namespace FNPlugin {
     class GameConstants {
-        public const double baseReprocessingRate = 0.4;
+        public const double baseReprocessingRate = 400;
         public const double basePowerConsumption = 5;
         public const double electrolysisEnergyPerTon = 18159;
         public const double bakingEnergyPerTon = 4920;
@@ -20,6 +20,8 @@ namespace FNPlugin {
         public const double baseCentriPowerConsumption = 43.5;
         public const double deuterium_abudance = 0.00015625;
         public const double deuterium_timescale = 0.0016667;
+        public const double baseUraniumAmmonolysisConsumption = 12;
+        public const double baseUraniumAmmonolysisRate = 0.0002383381;
         public const double stefan_const = 5.670373e-8;
         public const double warpspeed = 29979245.8;
         public const float MAX_ANTIMATTER_TANK_STORED_CHARGE = 1000;
@@ -43,5 +45,18 @@ namespace FNPlugin {
         public const double basePechineyUgineKuhlmannPowerConsumption = 5;
         public const double pechineyUgineKuhlmannMassRatio = 0.4847459883;
         public const double pechineyUgineKuhlmannEnergyPerTon = 1021;
+        public const double telescopePerformanceTimescale = 2.1964508725630127431022388314009e-8;
+        public const double telescopeBaseScience = 0.5;
+        public const double telescopeGLensScience = 15;
+        public const float tritiumBreedRate = 428244.662271f;
+        public const double antimatter_initiated_antimatter_cons_constant = 6.5075e-6;
+        public const double antimatter_initiated_uf4_cons_constant = 1.0 / 128700.0;
+        public const double antimatter_initiated_d_he3_cons_constant = 4.0 / 9.0;
+        public const double antimatter_initiated_upgraded_d_he3_cons_constant = antimatter_initiated_d_he3_cons_constant * 1.037037;
+        public const double antimatter_initiated_upgraded_uf4_cons_constant = antimatter_initiated_uf4_cons_constant / 3.0;
+        public const double helium_boiloff_fraction = 1.667794e-8;
+        public const double baseHaberProcessEnergyPerTon = 34200;
+        public const double baseHaberProcessPowerConsumption = 20;
+        public const double ammoniaHydrogenFractionByMass = 0.17647;
     }
 }

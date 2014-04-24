@@ -35,17 +35,33 @@ namespace FNPlugin {
         public static string water_resource_name = "LqdWater";
         public static string hydrogen_peroxide_resource_name = "H2Peroxide";
         public static string ammonia_resource_name = "Ammonia";
+        public static bool using_toolbar = false;
+
+        public const int interstellar_major_version = 10;
+        public const int interstellar_minor_version = 0;
         
 		protected static bool plugin_init = false;
 		protected static bool is_thermal_dissip_disabled_init = false;
 		protected static bool is_thermal_dissip_disabled = false;
         protected static GameDatabase gdb;
         protected static bool resources_configured = false;
+        protected static bool tech_checked = false;
+        protected static TechUpdateWindow tech_window = null;
+        protected static int installed_tech_tree_version_id = 0;
+        protected static int new_tech_tree_version_id = 0;
         
         
         
         public static string getPluginSaveFilePath() {
             return KSPUtil.ApplicationRootPath + "saves/" + HighLogic.SaveFolder + "/WarpPlugin.cfg";
+        }
+
+        public static string getTechTreeFilePath() {
+            return KSPUtil.ApplicationRootPath + "saves/" + HighLogic.SaveFolder + "/tree.cfg";
+        }
+
+        public static string getNewTechTreeFilePath() {
+            return KSPUtil.ApplicationRootPath + "GameData/WarpPlugin/tree.cfg";
         }
 
         public static string getPluginSettingsFilePath() {
@@ -149,6 +165,16 @@ namespace FNPlugin {
             return config;
         }
 
+        public static ConfigNode getTechTreeFile() {
+            ConfigNode config = ConfigNode.Load(PluginHelper.getTechTreeFilePath());
+            return config;
+        }
+
+        public static ConfigNode getNewTechTreeFile() {
+            ConfigNode config = ConfigNode.Load(PluginHelper.getNewTechTreeFilePath());
+            return config;
+        }
+
         public static bool lineOfSightToSun(Vessel vess) {
             Vector3d a = vess.transform.position;
             Vector3d b = FlightGlobals.Bodies[0].transform.position;
@@ -213,7 +239,60 @@ namespace FNPlugin {
             return multiplier;
         }
 
+        public static float getImpactorScienceMultiplier(int refbody) {
+            float multiplier = 1;
 
+            if (refbody == REF_BODY_DUNA || refbody == REF_BODY_EVE || refbody == REF_BODY_IKE || refbody == REF_BODY_GILLY) {
+                multiplier = 7f;
+            } else if (refbody == REF_BODY_MUN || refbody == REF_BODY_MINMUS) {
+                multiplier = 5f;
+            } else if (refbody == REF_BODY_JOOL || refbody == REF_BODY_TYLO || refbody == REF_BODY_POL || refbody == REF_BODY_BOP) {
+                multiplier = 9f;
+            } else if (refbody == REF_BODY_LAYTHE || refbody == REF_BODY_VALL) {
+                multiplier = 11f;
+            } else if (refbody == REF_BODY_EELOO || refbody == REF_BODY_MOHO) {
+                multiplier = 14f;
+            } else if (refbody == REF_BODY_DRES) {
+                multiplier = 8f;
+            } else if (refbody == REF_BODY_KERBIN) {
+                multiplier = 0.5f;
+            } else {
+                multiplier = 0f;
+            }
+            return multiplier;
+        }
+
+        public void Start() {
+            tech_window = new TechUpdateWindow();
+            tech_checked = false;
+
+            if (!tech_checked) {
+                ConfigNode tech_nodes = PluginHelper.getTechTreeFile();
+                ConfigNode new_tech_nodes = PluginHelper.getNewTechTreeFile();
+
+                if (tech_nodes != null) {
+                    if (tech_nodes.HasNode("VERSION")) {
+                        ConfigNode version_node = tech_nodes.GetNode("VERSION");
+                        if (version_node.HasValue("id")) {
+                            installed_tech_tree_version_id = Convert.ToInt32(version_node.GetValue("id"));
+                        }
+                    }
+                }
+                if (new_tech_nodes != null) {
+                    if (new_tech_nodes.HasNode("VERSION")) {
+                        ConfigNode version_node2 = new_tech_nodes.GetNode("VERSION");
+                        if (version_node2.HasValue("id")) {
+                            new_tech_tree_version_id = Convert.ToInt32(version_node2.GetValue("id"));
+                        }
+                    }
+                }
+                if (new_tech_tree_version_id > installed_tech_tree_version_id) {
+                    tech_window.Show();
+                }
+
+                tech_checked = true;
+            }
+        }
 
 		public void Update() {
             this.enabled = true;
@@ -226,7 +305,7 @@ namespace FNPlugin {
 
             if (!resources_configured) {
                 ConfigNode plugin_settings = GameDatabase.Instance.GetConfigNode("WarpPlugin/WarpPluginSettings/WarpPluginSettings");
-                if(plugin_settings != null) {
+                if (plugin_settings != null) {
                     if (plugin_settings.HasValue("HydrogenResourceName")) {
                         PluginHelper.hydrogen_resource_name = plugin_settings.GetValue("HydrogenResourceName");
                         Debug.Log("[KSP Interstellar] Hydrogen resource name set to " + PluginHelper.hydrogen_resource_name);
@@ -264,16 +343,26 @@ namespace FNPlugin {
                         Debug.Log("[KSP Interstellar] ThermalMechanics set to enabled: " + !PluginHelper.is_thermal_dissip_disabled);
                     }
                     resources_configured = true;
+                } else {
+                    showInstallationErrorMessage();
                 }
                 
             }
+
+            
 
 			if (!plugin_init) {
                 gdb = GameDatabase.Instance;
 				plugin_init = true;
 
                 AvailablePart kerbalRadiationPart = PartLoader.getPartInfoByName("kerbalEVA");
-                kerbalRadiationPart.partPrefab.gameObject.AddComponent<FNModuleRadiation>();
+                if (kerbalRadiationPart.partPrefab.Modules != null) {
+                    if (kerbalRadiationPart.partPrefab.FindModulesImplementing<FNModuleRadiation>().Count == 0) {
+                        kerbalRadiationPart.partPrefab.gameObject.AddComponent<FNModuleRadiation>();
+                    }
+                } else {
+                    kerbalRadiationPart.partPrefab.gameObject.AddComponent<FNModuleRadiation>();
+                }
 
 				List<AvailablePart> available_parts = PartLoader.LoadedPartsList;
 				foreach (AvailablePart available_part in available_parts) {
@@ -337,25 +426,40 @@ namespace FNPlugin {
 
 							if(prefab_available_part.FindModulesImplementing<ElectricEngineController>().Count() > 0) {
 								available_part.moduleInfo = prefab_available_part.FindModulesImplementing<ElectricEngineController>().First().GetInfo();
+                                available_part.moduleInfos.RemoveAll(modi => modi.moduleName == "Engine");
+                                AvailablePart.ModuleInfo mod_info = available_part.moduleInfos.Where(modi => modi.moduleName == "Electric Engine Controller").First();
+                                mod_info.moduleName = "Electric Engine";
 							}
 
 							if(prefab_available_part.FindModulesImplementing<FNNozzleController>().Count() > 0) {
 								available_part.moduleInfo = prefab_available_part.FindModulesImplementing<FNNozzleController>().First().GetInfo();
+                                available_part.moduleInfos.RemoveAll(modi => modi.moduleName == "Engine");
+                                AvailablePart.ModuleInfo mod_info = available_part.moduleInfos.Where(modi => modi.moduleName == "FNNozzle Controller").First();
+                                mod_info.moduleName = "Thermal Nozzle";
 							}
                             
-							if(prefab_available_part.CrewCapacity > 0) {
+							if(prefab_available_part.CrewCapacity > 0 || prefab_available_part.FindModulesImplementing<ModuleCommand>().Count > 0) {
 								Type type = AssemblyLoader.GetClassByName(typeof(PartModule), "FNModuleRadiation");
 								FNModuleRadiation pm = null;
 								if(type != null) {
 									pm = prefab_available_part.gameObject.AddComponent(type) as FNModuleRadiation;
 									prefab_available_part.Modules.Add(pm);
-									double rad_hardness = prefab_available_part.mass /((double)prefab_available_part.CrewCapacity)*7.5;
+									double rad_hardness = prefab_available_part.mass /(Math.Max(prefab_available_part.CrewCapacity,0.1))*7.5;
 									pm.rad_hardness = rad_hardness;
+                                    AvailablePart.ModuleInfo minfo = new AvailablePart.ModuleInfo();
+                                    minfo.moduleName = "Radiation Status";
+                                    minfo.info = pm.GetInfo();
+                                    available_part.moduleInfos.Add(minfo);
 								}
+                                print("Adding ModuleRadiation to " + prefab_available_part.name);
 							}
 						}
 					}catch(Exception ex) {
-                        print("[KSP Interstellar] Exception caught adding to: " + prefab_available_part.name + " part: " + ex.ToString());
+                        if (prefab_available_part != null) {
+                            print("[KSP Interstellar] Exception caught adding to: " + prefab_available_part.name + " part: " + ex.ToString());
+                        } else {
+                            print("[KSP Interstellar] Exception caught adding to unknown module");
+                        }
 					}
 
 
@@ -369,7 +473,7 @@ namespace FNPlugin {
 
 		public static void showInstallationErrorMessage() {
 			if (!warning_displayed) {
-				PopupDialog.SpawnPopupDialog ("KSP Interstellar Installation Error", "KSP Interstellar is unable to detect files required for the functioning of this rocket.  Please make sure that this mod has been installed to [Base KSP directory]/GameData/WarpPlugin.", "OK", false, HighLogic.Skin);
+				PopupDialog.SpawnPopupDialog ("KSP Interstellar Installation Error", "KSP Interstellar is unable to detect files required for proper functioning.  Please make sure that this mod has been installed to [Base KSP directory]/GameData/WarpPlugin.", "OK", false, HighLogic.Skin);
 				warning_displayed = true;
 			}
 		}

@@ -21,6 +21,12 @@ namespace FNPlugin{
 
         bool isVolatileSource();
 
+        float getMinimumThermalPower();
+
+        float getCoreTempAtRadiatorTemp(float rad_temp);
+
+        float getThermalPowerAtTemp(float temp);
+
 	}
 }
 

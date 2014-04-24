@@ -5,6 +5,7 @@ using System.Text;
 using UnityEngine;
 
 namespace FNPlugin {
+    [KSPModule("Radiator")]
 	class FNRadiator : FNResourceSuppliableModule	{
 		[KSPField(isPersistant = true)]
 		public bool radiatorIsEnabled;
@@ -109,6 +110,26 @@ namespace FNPlugin {
 			return average_temp;
 		}
 
+        public static double getAverageMaximumRadiatorTemperatureForVessel(Vessel vess) {
+            list_of_radiators.RemoveAll(item => item == null);
+            double average_temp = 0;
+            double n_radiators = 0;
+            foreach (FNRadiator radiator in list_of_radiators) {
+                if (radiator.vessel == vess) {
+                    average_temp += radiator.radiatorTemp;
+                    n_radiators += 1.0f;
+                }
+            }
+
+            if (n_radiators > 0) {
+                average_temp = average_temp / n_radiators;
+            } else {
+                average_temp = 0;
+            }
+
+            return average_temp;
+        }
+
 
 		[KSPEvent(guiActive = true, guiName = "Deploy Radiator", active = true)]
 		public void DeployRadiator() {
@@ -169,7 +190,14 @@ namespace FNPlugin {
 			Actions["RetractRadiatorAction"].guiName = Events["RetractRadiator"].guiName = String.Format("Retract Radiator");
 			Actions["ToggleRadiatorAction"].guiName = String.Format("Toggle Radiator");
 
-			if (state == StartState.Editor) { return; }
+            if (state == StartState.Editor) {
+                if (hasTechsRequiredToUpgrade()) {
+                    isupgraded = true;
+                    hasrequiredupgrade = true;
+                    isupgraded = true;
+                }
+                return;
+            }
 			
 
 			FNRadiator.list_of_radiators.Add (this);
@@ -204,9 +232,6 @@ namespace FNPlugin {
 
 			if (radiatorInit == false) {
 				radiatorInit = true;
-				if(hasrequiredupgrade) {
-					isupgraded = true;
-				}
 			}
 
 			if (!isupgraded) {
@@ -349,6 +374,21 @@ namespace FNPlugin {
 
 		}
 
+        public bool hasTechsRequiredToUpgrade() {
+            if (HighLogic.CurrentGame != null) {
+                if (HighLogic.CurrentGame.Mode == Game.Modes.CAREER) {
+                    if (upgradeTechReq != null) {
+                        if (PluginHelper.hasTech(upgradeTechReq)) {
+                            return true;
+                        }
+                    }
+                } else {
+                    return true;
+                }
+            }
+            return false;
+        }
+
 		public float getRadiatorTemperature() {
 			return (float)current_rad_temp;
 		}
@@ -363,6 +403,10 @@ namespace FNPlugin {
             float thermal_power_dissip7 = (float)(GameConstants.stefan_const * radiatorArea * Math.Pow(3000, 4) / 1e6);
             return String.Format("Maximum Waste Heat Radiated\n Base: {0} MW\n Upgraded: {1} MW\n-----\nRadiator Performance at:\n600K: {2} MW\n1200K: {3} MW\n1800K: {4} MW\n2400K: {5} MW\n3000K: {6} MW\n", thermal_power_dissip, thermal_power_dissip2, thermal_power_dissip3, thermal_power_dissip4, thermal_power_dissip5, thermal_power_dissip6, thermal_power_dissip7);
 		}
+
+        public override int getPowerPriority() {
+            return 3;
+        }
 
 	}
 }

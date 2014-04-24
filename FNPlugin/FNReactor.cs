@@ -1,8 +1,11 @@
-﻿using System;
+﻿extern alias ORSv1_1;
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using UnityEngine;
+using ORSv1_1::OpenResourceSystem;
 
 namespace FNPlugin {
     class FNReactor : FNResourceSuppliableModule, FNThermalSource, FNUpgradeableModule {
@@ -10,17 +13,17 @@ namespace FNPlugin {
         [KSPField(isPersistant = true)]
         public bool IsEnabled = true;
         [KSPField(isPersistant = true)]
-        public bool isupgraded = false;
+        public bool isupgraded;
         [KSPField(isPersistant = true)]
-        public bool breedtritium = false;
+        public bool breedtritium;
         [KSPField(isPersistant = true)]
         public float last_active_time;
         [KSPField(isPersistant = true)]
         public float ongoing_consumption_rate;
         [KSPField(isPersistant = true)]
-        public bool reactorInit = false;
+        public bool reactorInit;
         [KSPField(isPersistant = true)]
-        public bool startDisabled = false;
+        public bool startDisabled;
 
         // Persistent False
         [KSPField(isPersistant = false)]
@@ -52,7 +55,9 @@ namespace FNPlugin {
         [KSPField(isPersistant = false)]
         public bool canShutdown = true;
         [KSPField(isPersistant = false)]
-        public float chargedParticleRatio = 0; 
+        public float chargedParticleRatio = 0;
+        [KSPField(isPersistant = false)]
+        public float upgradedChargedParticleRatio;
         
         // GUI
 		[KSPField(isPersistant = false, guiActive = true, guiName = "Type")]
@@ -91,6 +96,8 @@ namespace FNPlugin {
         protected double total_power_ratio = 0;
         protected double thermal_power_ratio = 0;
         protected double charged_power_ratio = 0;
+        protected bool convert_charged_to_thermal = true;
+        protected string name_to_use;
 
 
         //protected bool responsible_for_thermalmanager = false;
@@ -182,17 +189,23 @@ namespace FNPlugin {
             }
             if (upgradedName.Length > 0) {
                 reactorType = upgradedName;
+                name_to_use = upgradedName;
             } else {
                 reactorType = originalName;
+                name_to_use = originalName;
             }
             if (upgradedResourceRate > 0) {
                 resourceRate = upgradedResourceRate;
+            }
+            if (upgradedChargedParticleRatio > 0) {
+                chargedParticleRatio = upgradedChargedParticleRatio;
             }
 		}
 		     
 		public override void OnStart(PartModule.StartState state) {
             String[] resources_to_supply = { FNResourceManager.FNRESOURCE_THERMALPOWER, FNResourceManager.FNRESOURCE_WASTEHEAT, FNResourceManager.FNRESOURCE_CHARGED_PARTICLES };
 			this.resources_to_supply = resources_to_supply;
+            //name_to_use = originalName;
 			base.OnStart(state);
 
             Actions["ActivateReactorAction"].guiName = Events["ActivateReactor"].guiName = String.Format("Activate Reactor");
@@ -216,6 +229,7 @@ namespace FNPlugin {
             }
 
             if (startDisabled) {
+                last_active_time = (float) (Planetarium.GetUniversalTime() - 4.0 * 86400.0);
                 IsEnabled = false;
                 startDisabled = false;
             }
@@ -240,6 +254,7 @@ namespace FNPlugin {
                 double time_diff = now - last_active_time;
                 double resource_to_take = consumeReactorResource(resourceRate*time_diff*ongoing_consumption_rate);
                 if (breedtritium) {
+                    tritium_rate = (float)(ThermalPower / 1000.0f / GameConstants.tritiumBreedRate);
                     List<PartResource> lithium_resources = new List<PartResource>();
                     part.GetConnectedResources(PartResourceLibrary.Instance.GetDefinition("Lithium").id, lithium_resources);
                     double lithium_current_amount = 0;
@@ -256,8 +271,8 @@ namespace FNPlugin {
 
                     double lithium_to_take = Math.Min(tritium_rate * time_diff * ongoing_consumption_rate, lithium_current_amount);
                     double tritium_to_add = Math.Min(tritium_rate * time_diff * ongoing_consumption_rate, tritium_missing_amount);
-                    part.RequestResource("Lithium", Math.Min(tritium_to_add, lithium_to_take));
-                    part.RequestResource("Tritium", -Math.Min(tritium_to_add,lithium_to_take));
+                    ORSHelper.fixedRequestResource(part, "Lithium", Math.Min(tritium_to_add, lithium_to_take));
+                    ORSHelper.fixedRequestResource(part, "Tritium", -Math.Min(tritium_to_add, lithium_to_take));
                 }
             }
             this.part.force_activate();
@@ -271,10 +286,10 @@ namespace FNPlugin {
 			} else {
 				Events ["RetrofitReactor"].active = false;
 			}
-            Events["BreedTritium"].active = !breedtritium && isNeutronRich();
-            Events["StopBreedTritium"].active = breedtritium && isNeutronRich();
+            Events["BreedTritium"].active = !breedtritium && isNeutronRich() && IsEnabled;
+            Events["StopBreedTritium"].active = breedtritium && isNeutronRich() && IsEnabled;
             Fields["upgradeCostStr"].guiActive = !isupgraded && hasrequiredupgrade;
-            Fields["tritiumBreedRate"].guiActive = breedtritium && isNeutronRich();
+            Fields["tritiumBreedRate"].guiActive = breedtritium && isNeutronRich() && IsEnabled;
             Fields["currentPwr"].guiActive = IsEnabled;
             Fields["currentPwr2"].guiActive = IsEnabled;
             coretempStr = ReactorTemp.ToString("0") + "K";
@@ -337,11 +352,11 @@ namespace FNPlugin {
                 last_draw_update = update_count;
             }
 
-            if (isupgraded) {
-                reactorType = getPowerFormatString(ThermalPower) + " " + upgradedName;
-            } else {
-                reactorType = getPowerFormatString(ThermalPower) + " " + originalName;
-            }
+            //if (isupgraded) {
+            //    reactorType = getPowerFormatString(ThermalPower) + " " + upgradedName;
+            //} else {
+                reactorType = getPowerFormatString(ThermalPower) + " " + name_to_use;
+            //}
 
             update_count++;
         }
@@ -350,8 +365,16 @@ namespace FNPlugin {
             return ReactorTemp;
         }
 
+        public virtual float getCoreTempAtRadiatorTemp(float rad_temp) {
+            return ReactorTemp;
+        }
+
+        public virtual float getThermalPowerAtTemp(float temp) {
+            return ThermalPower;
+        }
+
         public float getThermalPower() {
-            return ThermalPower*(1.0f - chargedParticleRatio);
+            return ThermalPower;
         }
 
         public float getChargedPower() {
@@ -364,6 +387,10 @@ namespace FNPlugin {
 
         public virtual bool isNeutronRich() {
             return false;
+        }
+
+        public virtual float getMinimumThermalPower() {
+            return 0;
         }
 
 		public float getRadius() {
@@ -427,37 +454,51 @@ namespace FNPlugin {
                 if (double.IsNaN(power_to_supply) || double.IsInfinity(power_to_supply)) {
                     power_to_supply = 0;
                 }
-                double thermal_power_to_supply = power_to_supply * (1.0 - chargedParticleRatio);
+                
+
+                // charged power
                 double charged_particles_to_supply = power_to_supply * chargedParticleRatio;
-                double thermal_power_received = supplyManagedFNResourceWithMinimum(thermal_power_to_supply, min_throttle, FNResourceManager.FNRESOURCE_THERMALPOWER);
-                double charged_power_received = supplyManagedFNResourceWithMinimum(charged_particles_to_supply, min_throttle, FNResourceManager.FNRESOURCE_CHARGED_PARTICLES);
+                //double min_charged = convert_charged_to_thermal ? 0 : minimumThrottle;
+                double min_charged = minimumThrottle;
+                double charged_power_received = supplyManagedFNResourceWithMinimum(charged_particles_to_supply, min_charged, FNResourceManager.FNRESOURCE_CHARGED_PARTICLES);
+                if (chargedParticleRatio > 0) {
+                    charged_power_ratio = charged_power_received / ThermalPower / chargedParticleRatio / TimeWarp.fixedDeltaTime;
+                } else {
+                    charged_power_ratio = 0;
+                }
+                //double converted_thermal_power = convert_charged_to_thermal ? (charged_particles_to_supply - charged_power_received) : 0;
+                double converted_thermal_power = 0;
+                
+                // thermal power
+                //min_throttle = Math.Max(min_throttle, charged_power_ratio);
+                double thermal_power_to_supply = power_to_supply * (1.0 - chargedParticleRatio);
+                double thermal_power_received = supplyManagedFNResourceWithMinimum(thermal_power_to_supply + converted_thermal_power, min_throttle, FNResourceManager.FNRESOURCE_THERMALPOWER);
                 total_power = (thermal_power_received + charged_power_received);
                 if (getResourceBarRatio(FNResourceManager.FNRESOURCE_WASTEHEAT) < 0.95) {
-                    supplyFNResource(thermal_power_received, FNResourceManager.FNRESOURCE_WASTEHEAT); // generate heat that must be dissipated
+                    supplyFNResource(total_power, FNResourceManager.FNRESOURCE_WASTEHEAT); // generate heat that must be dissipated
                 }
                 if ((1 - chargedParticleRatio) > 0) {
                     thermal_power_ratio = thermal_power_received / ThermalPower / (1 - chargedParticleRatio) / TimeWarp.fixedDeltaTime;
                 } else {
                     thermal_power_ratio = 0;
                 }
-                if (chargedParticleRatio > 0) {
-                    charged_power_ratio = charged_power_received / ThermalPower / chargedParticleRatio/ TimeWarp.fixedDeltaTime;
-                } else {
-                    charged_power_ratio = 0;
-                }
+                
+                // total power
                 total_power_ratio = total_power / ThermalPower / TimeWarp.fixedDeltaTime;
                 ongoing_consumption_rate = (float)total_power_ratio;
                 double return_ratio = 1 - total_power_ratio;
                 double resource_returned = returnReactorResource(resource_provided * return_ratio);
                 powerPcnt = (float)(resource_ratio * 100.0 * total_power_ratio);
-                tritium_rate = (float) (thermal_power_received/TimeWarp.fixedDeltaTime/1000.0f/28800.0f);
+                tritium_rate = (float)(thermal_power_received / TimeWarp.fixedDeltaTime / 1000.0f / GameConstants.tritiumBreedRate)*(1-chargedParticleRatio);
                 if (breedtritium) {
                     double lith_rate = tritium_rate * TimeWarp.fixedDeltaTime;
-                    double lith_used = part.RequestResource("Lithium", lith_rate);
-                    tritium_produced_f = (float) (-part.RequestResource("Tritium", -lith_used) / TimeWarp.fixedDeltaTime);
-                    //if (tritium_produced_f <= 0) {
-                    //    breedtritium = false;
-                    //}
+                    //double lith_used = part.RequestResource("Lithium", lith_rate);
+                    double lith_used = ORSHelper.fixedRequestResource(part,"Lithium",lith_rate);
+                    tritium_produced_f = (float)(-ORSHelper.fixedRequestResource(part, "Tritium", -lith_used)/TimeWarp.fixedDeltaTime);
+                    //tritium_produced_f = (float) (-part.RequestResource("Tritium", -lith_used) / TimeWarp.fixedDeltaTime);
+                    if (tritium_produced_f <= 0) {
+                        breedtritium = false;
+                    }
                 }
                 if (Planetarium.GetUniversalTime() != 0) {
                     last_active_time = (float)Planetarium.GetUniversalTime();
@@ -523,8 +564,8 @@ namespace FNPlugin {
 			double temp = double.MaxValue;
 			foreach (FNReactor reactor in reactors) {
 				if (reactor != null) {
-					if (reactor.getCoreTemp () < temp && reactor.isActive()) {
-						temp = reactor.getCoreTemp ();
+                    if (reactor.getCoreTemp() < temp && reactor.isActive()) {
+                        temp = reactor.getCoreTemp();
 					}
 				}
 			}

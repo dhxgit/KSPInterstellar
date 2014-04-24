@@ -334,6 +334,9 @@ namespace FNPlugin{
 			myAttachedEngine.atmosphereCurve = newISP;
 			myAttachedEngine.velocityCurve = vCurve;
 			assThermalPower = myAttachedReactor.getThermalPower();
+            if (myAttachedReactor is FNFusionReactor) {
+                assThermalPower = assThermalPower * 0.95f;
+            }
 		}
 
 		public float getAtmosphericLimit() {
@@ -421,11 +424,15 @@ namespace FNPlugin{
                         proportion = 1;
                     }
                     part.temperature = (float)Math.Max((Math.Sqrt(vessel.srf_velocity.magnitude) * 20.0 / GameConstants.atmospheric_non_precooled_limit) * part.maxTemp * proportion, 1);
-                    myAttachedEngine.DeactivateRunningFX();
+                    //myAttachedEngine.DeactivateRunningFX();
                 } else {
-                    myAttachedEngine.ActivateRunningFX();
+                    //myAttachedEngine.ActivateRunningFX();
                 }
-				double thermal_power_received = consumeFNResource (assThermalPower * TimeWarp.fixedDeltaTime * myAttachedEngine.currentThrottle*atmospheric_limit, FNResourceManager.FNRESOURCE_THERMALPOWER) / TimeWarp.fixedDeltaTime;
+                double thermal_consume_total = assThermalPower * TimeWarp.fixedDeltaTime * myAttachedEngine.currentThrottle * atmospheric_limit;
+                double thermal_power_received = consumeFNResource(thermal_consume_total, FNResourceManager.FNRESOURCE_THERMALPOWER) / TimeWarp.fixedDeltaTime;
+                if (thermal_power_received * TimeWarp.fixedDeltaTime < thermal_consume_total) {
+                    thermal_power_received += consumeFNResource(thermal_consume_total-thermal_power_received*TimeWarp.fixedDeltaTime, FNResourceManager.FNRESOURCE_CHARGED_PARTICLES) / TimeWarp.fixedDeltaTime;
+                }
 				consumeFNResource (thermal_power_received * TimeWarp.fixedDeltaTime, FNResourceManager.FNRESOURCE_WASTEHEAT);
 				float power_ratio = 0.0f;
 				double engineMaxThrust = 0.01;
@@ -435,8 +442,8 @@ namespace FNPlugin{
 				} 
 				//print ("B: " + engineMaxThrust);
 				// set up TWR limiter if on
-                double additional_thrust_compensator = myAttachedEngine.finalThrust / (myAttachedEngine.maxThrust * myAttachedEngine.currentThrottle)/ispratio;
-				double engine_thrust = engineMaxThrust;
+                //double additional_thrust_compensator = myAttachedEngine.finalThrust / (myAttachedEngine.maxThrust * myAttachedEngine.currentThrottle)/ispratio;
+				double engine_thrust = engineMaxThrust/myAttachedEngine.thrustPercentage*100;
 				// engine thrust fixed
 				//print ("A: " + engine_thrust*myAttachedEngine.velocityCurve.Evaluate((float)vessel.srf_velocity.magnitude));
                 if (!double.IsInfinity(engine_thrust) && !double.IsNaN(engine_thrust)) {
@@ -533,6 +540,9 @@ namespace FNPlugin{
 			return return_str;
 		}
 
+        public override int getPowerPriority() {
+            return 1;
+        }
 
 		// Static Methods
 		// Amount of intake air available to use of a particular resource type
